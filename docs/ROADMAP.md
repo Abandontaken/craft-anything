@@ -844,6 +844,10 @@ Owner: open · Status: in progress
       have no file there)
 - [x] `ai test` names the program it ran and the saved one it replaced, and `doctor` says a saved
       path has no program there instead of blaming PATH (#721)
+- [x] `doctor` says "Several copies are on PATH" for one file reached twice, when a PATH folder
+      is a symlink to another (`/bin` -> `/usr/bin`, so both spell the same program, #1550):
+      compare where the copies really are before counting them
+      — claimed: muraa-p, branch bugfix/1550-doctor-symlink
 - [x] `doctor` looks a registration's bare command (`craft-anything-cli`, as a hand-made entry
       names it) up on PATH, as the app starting it does, instead of calling it missing.
       — claimed: Plastic-time, branch bugfix/r2.2-doctor-cli-on-path
@@ -1015,7 +1019,13 @@ Owner: open · Status: in progress
       `null`; setup and the builder now approve our tools for Codex (we still ask before running
       code) and a refusal explains the fix (`docs/codex.md`)
 - [ ] Codex (#540): run `codex exec` on a real install and check `rebuild_start` gets through
-- [ ] Codex: resume support (`codex exec resume <id>`), verified on a real install
+- [x] Codex: resume support (`codex exec resume <id>`), verified on a real install
+      — claimed: Codex, branch feature/r2.2-codex-resume (local workspace)
+      — verified on macOS with Codex 0.169.0-alpha.11.1: MCP call, sandboxed file write,
+        follow-up and reopened thread through `codex_resume_smoke`; not a full rebuild
+      — missing-thread stderr clears the unavailable session; parser and runner recovery
+        regressions cover it. Resume argument order on older Codex releases is unverified
+      — refuse `--ephemeral` before startup; two-turn regression checks that no session is saved
 - [ ] Aider: move the message to `--message-file` once the launcher can write one (see the argv item above).
 - [x] Aider: read project-folder `.aider.conf.yml` and `.env` in `check_setup`, which needs the working directory passed into `check_native_options`.
       It reads the run's folder, the top of its git repository, then the home folder, as Aider
@@ -1347,7 +1357,9 @@ Gaps found while using the app for real projects.
       — claimed: Afloat16, branch bugfix/r2.9-atomic-temp-creation-20261103b
 - [x] A prompt brought back with Up keeps its pictures (their paths are absolute, so they don't
       come back after the project is moved)
-- [ ] Change a project's builder from its page (a tool, so the CLI and MCP can too) — in PR #245
+- [x] Change a project's builder from the CLI and MCP: `project_builder_set`, with `default`
+      giving it back to the app's choice — PR #1833
+- [ ] Change a project's builder from its page, through that same tool (the app's own control)
 - [x] `chat --backend <a name that is turned off>` and `compare` refuse it before model or
       agent setup: `AiHub::start` checks `enabled` and says how to turn it on or choose another
       — PR #1008; claimed: Codex, branch bugfix/r2.9-disabled-chat-backend
@@ -1521,9 +1533,9 @@ Gaps found while using the app for real projects.
       switcher in every README (#831)
 - [x] A Thai README (`README.th.md`) translated from `README.md` and linked from the language
       switcher in every README
-- [ ] Vietnamese letters with stacked marks (ạ ả ấ ế ơ ư ữ…) aren't in the bundled DM Sans or egui's
+- [ ] Vietnamese letters with stacked marks (ạ ả ấ ế ơ ư ữ…) aren't in the bundled Figtree or egui's
       default fonts: without craft-fonts they show as boxes, and with it each such letter comes from
-      Noto Sans CJK while the rest of the word is DM Sans. Bundle a DM Sans build that has the
+      Noto Sans CJK while the rest of the word is Figtree. Bundle a build of the text font that has the
       Vietnamese set (with its OFL notice) so Tiếng Việt renders in one face
 - [x] A build told craft-fonts are required (`CRAFT_FONTS_REQUIRED=1`) finished with none
       embedded when `CRAFT_FONTS_DIR` was missing: the build script read the switch only when the
@@ -1643,12 +1655,31 @@ Gaps found while using the app for real projects.
       a Rust project rewritten in Python is still checked with Cargo until the old manifest is
       moved out (#1837): record the stack from what was built for every toolchain, and check
       with that
+- [x] One design system for the desktop app: a typed scale (text sizes, gaps, padding, icon and
+      control sizes) in `theme.rs`, one set of buttons (primary, secondary, ghost, danger),
+      switches and fields in `widgets.rs`, and every screen moved onto them, so sizes and spacing
+      stop differing from screen to screen; a test keeps literal sizes, paddings and colours out
+      of the screens (`docs/design-system.md`). With it: Figtree for text; corners of 4, 6 and 8;
+      fields and buttons a shade lighter than their card, with one soft edge; dropdowns, menus
+      and the project's side panel as lists of rows; messages in the title bar; a sliding
+      segmented switch; sharper small text and a wheel step of 100 points. Checked on every
+      snapshot scene in both themes and in the app on Windows; not on macOS or Linux
+      — claimed: bflatastic, branch refactor/ui-design-system
+- [ ] Design system, left for later: links come in two sizes (`widgets::link` follows the text
+      around it); the title bar keeps its own control height (30, or 26 on macOS) instead of a
+      `ControlSize`; frames with four different sides (prompt box, sidebar, workbench rails)
+      still write their padding where it is used; the macOS disk image's background is still
+      drawn in DM Sans and JetBrains Mono; dropdowns have no name for screen readers, only
+      their value; fields and dropdowns have no 3:1 border at rest (WCAG 1.4.11), by choice,
+      which wants a second look; a compact field is about a point taller than a button
 
 ### R2.10 Pinned builds
 Owner: maintainers · Status: in progress
 Keep a build that works at hand: pin it, and open it from the sidebar whatever the builder does
 to the project next.
-- [ ] Say when a light pin ended up copying what it meant to share (a drive without hard links)
+- [x] Say when a light pin ended up copying what it meant to share (a drive without hard links):
+      `copied_shared_bytes` on `Pin`, counted when a `Light` pin's file couldn't be linked, and said
+      in a toast with the size (`a_shared_file_that_cannot_be_linked_is_counted_as_copied`)
       — in PR #220
 - [ ] Pins of one project sharing with each other, so a third frozen copy of the same assets
       takes no more space
@@ -1688,7 +1719,8 @@ Owner: open · Status: todo
 
 ### R3.9 Game assets out
 Owner: open · Status: in progress
-- [ ] Unity: sounds out (the stored stream, usually FSB5; PCM ones as WAV)
+- [x] Unity: sounds out (the stored stream, usually FSB5; PCM ones as WAV)
+      — claimed: NicolasBohn, branch feature/r3.9-unity-sounds
 - [ ] Unity: crunched textures (DXT1Crunched, DXT5Crunched; two of the games checked use them)
 - [x] Unity: decode R16 and RG16 texture pixels through the shared bounded PNG export path.
       — claimed: Afloat16, branch feature/r3.9-unity-integer-textures-20261109
@@ -1744,8 +1776,14 @@ Owner: open · Status: in progress
       released port that another listener may reuse
       — claimed: Afloat16, branch test/r3.11-standin-session-lifetime-20261103
 - [ ] Stand-in backend: writes that change later reads (recorded answers are replayed as they are)
-- [ ] Tell the builder about the stand-in backend in a website's brief, and start one from a
-      recording
+- [x] Tell the builder about the stand-in backend in a website's brief, when the capture kept a
+      recording (`capture/*.har`): what `web_standin_build`, `web_standin_start` and the rest do
+      (`brief::standin_words`); Deep mode only, since Clean room reads nothing inside the original
+- [x] A Deep website study records the start page's traffic and the answers it gave into
+      `capture/original.har`, so the brief's stand-in offer has a recording to point at
+      (`analysis::web_har::har_from_network`, `browser_tools::write_recording`)
+- [ ] Live-check a Deep website study's recording on a real site, and the stand-in built from it
+- [ ] Start a stand-in backend from a recording automatically when a build begins
 - [x] Stand-in backend: retain 304 samples without a usable cached body for diagnostics, skip them
       during replay, and report `cached_body_unavailable` when the best matching group has no
       usable answer. Build results count them; cached bodies still answer as 200 (#543)
@@ -1879,6 +1917,8 @@ Owner: open · Status: in progress
       — claimed: Afloat16, branch bugfix/r3.12-bundle-numeric-identities
 - [x] Allocate distinct recovered module paths after repeated content-hash collisions.
       — claimed: Plastic-time, branch rrfz/bugfix-r3.12-js-module-collisions
+- [x] Bound the text JavaScript facts build from constant strings, so repeated concatenation of a constant with itself cannot grow without limit.
+      — claimed: Plastic-time, branch bugfix/r3.12-js-constant-text-budget
 - [x] Refuse oversized GNU tar long names and link targets instead of silently truncating member identities.
       — claimed: Afloat16, branch bugfix/r3.12-tar-long-identities-20261109
       Source [`de2c6390`](https://github.com/Afloat16/craft-anything/commit/de2c63908909cab675887103921ed2601b1bae9b) passed [formats tests, fmt and clippy](https://github.com/Afloat16/claude-mem/actions/runs/42640688213/job/129240669663)
@@ -2152,6 +2192,11 @@ Owner: open · Status: in progress
       — claimed: Afloat16, branch bugfix/r3.12-macho-zerofill-section-data
 - [x] Keep native address translations and reads inside both the mapped range and its file-backed bytes.
       — claimed: Afloat16, branch bugfix/r3.12-binary-padding
+- [x] `native_strings_find` lists at most 32 references per string without a count or flag, though
+      its search is described as complete; add the reference count (complete within the analysis
+      unless its xref limit was reached), a capped flag, the analysis xref-limit limitation and a
+      display-cap limitation, as `native_strings_browse` already reports a count.
+      — claimed: AlexJoaquimPereira, branch bugfix/r3.12-string-reference-count
 - [x] List each Objective-C class and category address once when ordinary and non-lazy registration tables overlap, keeping distinct same-named definitions separate.
       — claimed: Afloat16, branch bugfix/r3.12-objc-nonlazy-identity-20261111
 - [x] Require complete Objective-C method record strides before reading absolute or relative method fields.
@@ -2285,6 +2330,14 @@ Owner: open · Status: in progress
       — claimed: Plastic-time, branch bugfix/r3.12-plist-xml-line-endings-1111
 - [x] End JavaScript line comments at every language line terminator, preserving following tokens for the nesting admission guard and lexer fallback.
       — claimed: Afloat16, branch bugfix/r3.12-js-line-comment-boundaries
+- [x] Count call, index and tagged-template chains and consecutive labels in the JavaScript nesting estimate, so sources nested deeper than the parser's stack go to the lexer fallback instead of overflowing it.
+      — claimed: Plastic-time, branch bugfix/r3.12-js-postfix-chain-nesting
+- [x] Count the remaining JavaScript nesting shapes that overflow the parser's stack with two
+      million links: an `if(a);else if(a);else …` chain keeps the depth its `;` clears, a class
+      after `extends` nests a heritage, a run of prefix `++` counts, and `/` after an update
+      operator, a member name or `yield` divides, so brackets after it are counted instead of
+      hidden in a false regex; such sources go to the lexer fallback instead of the parser.
+      — claimed: AlexJoaquimPereira, branch bugfix/r3.12-js-nesting-overflow-shapes
 - [x] Read and edit JSONC registrations whose line comments end at a bare carriage return.
       — claimed: Afloat16, branch bugfix/r3.12-jsonc-carriage-return-comments
 - [x] Name code-directory flags with the bits Apple uses: hard 0x100, kill 0x200, expires 0x400,
@@ -2706,6 +2759,11 @@ Owner: open · Status: in progress
       summary reports the cut lengths as totals; report complete counts, mark `rows_capped`, and add
       partial coverage.
       — claimed: AlexJoaquimPereira, branch bugfix/r3.12-compare-row-totals
+- [ ] `app_graphs_compare` and `js_exports_compare` drop the loaded graph's analysis limitations
+      (a malformed source map, a truncated inventory, dynamic IPC names), so a comparison reads as
+      complete when a side was partial; carry each side's limitations into the comparison evidence
+      with left/right labels.
+      — claimed: AlexJoaquimPereira, branch bugfix/r3.12-compare-graph-limitations
 
 
 ### R3.13 Web inspection correctness

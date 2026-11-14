@@ -683,6 +683,16 @@ fn json_outline_limitation(result: &Value) -> Option<Limitation> {
     ))
 }
 
+/// Write the requests and answers a browser run kept as a HAR 1.2 recording, which
+/// `web_standin_build` reads, so a rebuilt front end can be given recorded answers (#1838).
+pub fn write_recording(requests: &[Value], path: &std::path::Path) -> Result<(), ToolError> {
+    let har = craft_anything_analysis::web_har::har_from_network(requests, &craft_anything_analysis::web_har::utc_iso_now());
+    let bytes = serde_json::to_vec_pretty(&har).map_err(|e| ToolError::internal(format!("the recording couldn't be written: {e}")))?;
+    // The bodies are a person's traffic, not declared secrets: private permissions keep other
+    // users on the machine out of the file, as the stand-in built from it already does.
+    craft_anything_platform::write_atomic_private(path, &bytes)
+}
+
 fn collect_websockets(events: &[cdp::CdpEvent], secrets: &mut Secrets) -> Value {
     let mut conns: std::collections::BTreeMap<String, Value> = std::collections::BTreeMap::new();
     let mut frames: Vec<Value> = Vec::new();
