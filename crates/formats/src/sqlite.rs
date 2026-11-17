@@ -1173,7 +1173,7 @@ fn column_definitions(sql: &str) -> Vec<(Column, &str)> {
         if name.is_empty() && !seg.starts_with(['"', '`', '\'', '[']) {
             continue;
         }
-        let type_name = extract_type(strip_comments(rest).trim());
+        let type_name = extract_type(rest);
         cols.push((Column { name, type_name }, rest));
     }
     cols
@@ -1204,7 +1204,7 @@ fn rowid_alias_index(sql: &str) -> Option<usize> {
     if tail.windows(2).any(|w| w.first().is_some_and(|t| is(t, "WITHOUT")) && w.get(1).is_some_and(|t| is(t, "ROWID"))) {
         return None;
     }
-    let columns = parse_create_columns(sql);
+    let columns = column_definitions(sql);
     let mut key = None;
     let mut column = 0usize;
     let body_start = open.saturating_add(1);
@@ -1228,7 +1228,7 @@ fn rowid_alias_index(sql: &str) -> Option<usize> {
                     return None;
                 }
                 let (name, _) = take_identifier(members.first()?);
-                key = Some(columns.iter().position(|c| c.name.eq_ignore_ascii_case(&name))?);
+                key = Some(columns.iter().position(|(column, _)| column.name.eq_ignore_ascii_case(&name))?);
             } else if !segment.first().is_some_and(|t| ["UNIQUE", "CHECK", "FOREIGN"].iter().any(|word| is(t, word))) {
                 let mut nesting = 0usize;
                 for (j, t) in segment.iter().enumerate().skip(1) {
@@ -1255,7 +1255,11 @@ fn rowid_alias_index(sql: &str) -> Option<usize> {
         }
     }
     let index = key?;
-    columns.get(index)?.type_name.eq_ignore_ascii_case("INTEGER").then_some(index)
+    let (_, declaration) = columns.get(index)?;
+    // SQLite can display a quoted type such as `"INTEGER"(10)` as `INTEGER`. Check
+    // the entire type spelling before applying display dequoting.
+    let spelling = declared_type_spelling(declaration);
+    ["INTEGER", "\"INTEGER\"", "'INTEGER'", "`INTEGER`", "[INTEGER]"].iter().any(|integer| spelling.eq_ignore_ascii_case(integer)).then_some(index)
 }
 
 /// Keep quoted text intact so defaults and constraint names cannot become SQL keywords.
@@ -1742,17 +1746,25 @@ fn take_identifier(seg: &str) -> (String, &str) {
 /// The type name is the run of tokens before the first column-constraint keyword. A comma inside
 /// the type's parentheses belongs to it (`DECIMAL(10, 2)`); only the column separator is dropped.
 fn extract_type(rest: &str) -> String {
+    let cleaned = strip_comments(rest);
+    let trimmed = cleaned.trim_start();
+    if trimmed.starts_with('[') {
+        // SQLite dequotes the full span only when its interior contains no quotation marks.
+        let spelling = declared_type_spelling(rest);
+        let inner = spelling.as_bytes().get(1..spelling.len().saturating_sub(1)).unwrap_or(&[]);
+        if inner.iter().any(|&byte| matches!(byte, b'\'' | b'"' | b'`' | b'[')) {
+            return take_identifier(trimmed).0;
+        }
+        return String::from_utf8_lossy(inner).into_owned();
+    }
+    if trimmed.starts_with(['"', '`', '\'']) {
+        return take_identifier(trimmed).0;
+    }
     let mut out = String::new();
     let mut depth = 0i32;
-    for tok in rest.split_whitespace() {
+    for tok in trimmed.split_whitespace() {
         let bare = tok.trim_end_matches(',');
-        let upper = bare.to_ascii_uppercase();
-        if depth == 0
-            && matches!(
-                upper.as_str(),
-                "PRIMARY" | "NOT" | "NULL" | "UNIQUE" | "CHECK" | "DEFAULT" | "COLLATE" | "REFERENCES" | "GENERATED" | "AS" | "CONSTRAINT" | "AUTOINCREMENT"
-            )
-        {
+        if depth == 0 && (starts_column_constraint(bare) || bare.eq_ignore_ascii_case("GENERATED") || bare.eq_ignore_ascii_case("AUTOINCREMENT")) {
             break;
         }
         depth += tok.matches('(').count() as i32;
@@ -1763,6 +1775,55 @@ fn extract_type(rest: &str) -> String {
         out.push_str(if depth == 0 { bare } else { tok });
     }
     out
+}
+
+/// Slice the whole type declaration, including precision and additional type words.
+fn declared_type_spelling(declaration: &str) -> &str {
+    let tokens = sql_tokens(declaration);
+    let Some(first) = tokens.first() else { return "" };
+    let start = (first.as_ptr() as usize).saturating_sub(declaration.as_ptr() as usize);
+    let mut depth = 0usize;
+    let mut end = start;
+    for (i, &token) in tokens.iter().enumerate() {
+        if depth == 0
+            && (starts_column_constraint(token)
+                || (token.eq_ignore_ascii_case("GENERATED")
+                    && tokens.get(i + 1).is_some_and(|next| next.eq_ignore_ascii_case("ALWAYS"))
+                    && tokens.get(i + 2).is_some_and(|next| next.eq_ignore_ascii_case("AS"))))
+        {
+            break;
+        }
+        match token {
+            "(" => depth = depth.saturating_add(1),
+            ")" => depth = depth.saturating_sub(1),
+            _ => {}
+        }
+        end = (token.as_ptr() as usize).saturating_sub(declaration.as_ptr() as usize) + token.len();
+    }
+    let spelling = declaration.get(start..end).unwrap_or("");
+    // SQLite's generated-column compatibility rule trims a trailing ALWAYS in types of at
+    // least 16 bytes, plus GENERATED immediately before it when present.
+    if spelling.len() >= 16
+        && let Some((stem, suffix)) = spelling.split_at_checked(spelling.len() - "ALWAYS".len())
+        && suffix.eq_ignore_ascii_case("ALWAYS")
+    {
+        let stem = stem.trim_ascii_end();
+        if let Some((prefix, suffix)) = stem.split_at_checked(stem.len().saturating_sub("GENERATED".len()))
+            && suffix.eq_ignore_ascii_case("GENERATED")
+        {
+            return prefix.trim_ascii_end();
+        }
+        return stem;
+    }
+    spelling
+}
+
+/// Unambiguous first tokens for a SQLite column constraint.
+fn starts_column_constraint(token: &str) -> bool {
+    matches!(
+        token.to_ascii_uppercase().as_str(),
+        "PRIMARY" | "NOT" | "NULL" | "UNIQUE" | "CHECK" | "DEFAULT" | "COLLATE" | "REFERENCES" | "DEFERRABLE" | "AS" | "CONSTRAINT"
+    )
 }
 
 #[cfg(test)]

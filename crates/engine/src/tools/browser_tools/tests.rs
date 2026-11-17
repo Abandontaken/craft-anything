@@ -343,6 +343,10 @@ fn walkthrough_keeps_requested_network_content_redacted() {
     assert_eq!(req["response_header_values"]["set-cookie"], "«redacted»");
     assert_eq!(req["response_body"]["text"], "{\"id\":1,\"secret\":\"x\"}");
     assert_eq!(req["response_body"]["sha256"].as_str().unwrap().len(), 64);
+    let bodies = &v["result"]["network"]["response_bodies"];
+    assert_eq!(bodies["kept"], bodies["requests"], "{bodies}");
+    assert_eq!((bodies["past_cap"].as_u64(), bodies["after_deadline"].as_u64(), bodies["unreadable"].as_u64()), (Some(0), Some(0), Some(0)), "{bodies}");
+    assert!(!v["limitations"].as_array().unwrap().iter().any(|l| l["code"] == "response_bodies_partial"));
 
     let err = run(json!({"capture_network": false, "keep_bodies": {"response_body": true}})).unwrap_err();
     assert!(err.message.contains("capture_network"), "{}", err.message);
@@ -526,6 +530,24 @@ fn inspect_page_minimises_and_redacts() {
     // The response Set-Cookie header is reported only by presence, never by value.
     assert!(reqs.iter().any(|r| r["response_headers"]["credentials_present"].as_array().map(|a| a.iter().any(|c| c == "set-cookie")).unwrap_or(false)));
     assert_eq!(v["authority"], "earlier-record");
+}
+
+#[test]
+fn skipped_kept_bodies_become_a_limitation() {
+    use super::kept_body_limitation;
+    let tally = |kept: u64, past_cap: u64, after_deadline: u64, unreadable: u64| {
+        json!({"response_bodies": {"requests": kept + past_cap + after_deadline + unreadable, "kept": kept,
+            "past_cap": past_cap, "after_deadline": after_deadline, "unreadable": unreadable}})
+    };
+    let l = kept_body_limitation(&tally(200, 48, 0, 0)).unwrap();
+    assert_eq!(l.code, "response_bodies_partial");
+    assert!(l.message.contains("200 of 248 requests kept a response body"), "{}", l.message);
+    assert!(l.message.contains("48 past the first 200 requests"), "{}", l.message);
+    let l = kept_body_limitation(&tally(10, 0, 3, 2)).unwrap();
+    assert!(l.message.contains("3 after the run's deadline and 2 whose body the browser couldn't return"), "{}", l.message);
+    assert!(kept_body_limitation(&tally(2, 0, 0, 0)).is_none());
+    assert!(kept_body_limitation(&json!({})).is_none(), "no tally when bodies weren't asked for");
+    assert!(kept_body_limitation(&Value::Null).is_none());
 }
 
 #[test]

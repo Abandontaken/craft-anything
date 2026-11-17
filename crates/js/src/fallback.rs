@@ -142,6 +142,11 @@ fn api_token(f: &mut ModuleFacts, sig: &[&Token<'_>], i: usize, off: u32, line: 
         }
         TokKind::Ident => {
             let Some(kind) = api_ops::client_hook(t.text) else { return };
+            // A hook property can be saved or passed around without calling the procedure.
+            let called = at(i + 1) == Some((TokKind::Punct, "(")) || (at(i + 1) == Some((TokKind::Punct, "?.")) && at(i + 2) == Some((TokKind::Punct, "(")));
+            if !called {
+                return;
+            }
             // Back along `a.b.c.useQuery`, as far as plain names go.
             let mut path: Vec<&str> = Vec::new();
             let mut j = i;

@@ -618,12 +618,16 @@ pub(crate) fn collect_network(
             "json_outlines_unreadable": tried.saturating_sub(outlined),
         }));
     }
+    let mut kept_bodies = None;
     if content.response_body {
-        let ids: Vec<String> = order.iter().take(200).cloned().collect();
+        let ids: Vec<String> = order.iter().take(RESPONSE_BODY_CAP).cloned().collect();
+        let mut tried = 0u64;
+        let mut unreadable = 0u64;
         for id in ids {
             if dl.expired() {
                 break;
             }
+            tried += 1;
             let kept = match client.call("Network.getResponseBody", json!({"requestId": id}), None, dl) {
                 Ok(body) => {
                     let text = body.get("body").and_then(Value::as_str).unwrap_or_default();
@@ -634,19 +638,71 @@ pub(crate) fn collect_network(
                     };
                     web_common::kept_body(&raw, secrets)
                 }
-                Err(e) => json!({"state": "unavailable", "reason": e.message}),
+                Err(e) => {
+                    unreadable += 1;
+                    json!({"state": "unavailable", "reason": e.message})
+                }
             };
             if let Some(entry) = reqs.get_mut(&id) {
                 entry["response_body"] = kept;
             }
         }
+        // Like the outlines above: a request with no kept body was past the cap, after the
+        // deadline, or its body couldn't be read, never "it had no body".
+        let total = order.len() as u64;
+        let past_cap = total.saturating_sub(RESPONSE_BODY_CAP as u64);
+        kept_bodies = Some(json!({
+            "requests": total,
+            "kept": tried.saturating_sub(unreadable),
+            "past_cap": past_cap,
+            "after_deadline": total.saturating_sub(past_cap).saturating_sub(tried),
+            "unreadable": unreadable,
+        }));
     }
     let items: Vec<Value> = order.iter().filter_map(|id| reqs.get(id).cloned()).collect();
     let mut out = json!({"request_count": items.len(), "requests": items});
     if let Some(json) = json {
         out["json_outlines"] = json;
     }
+    if let Some(bodies) = kept_bodies {
+        out["response_bodies"] = bodies;
+    }
     out
+}
+
+/// Most response bodies a run keeps (`keep_bodies.response_body`).
+const RESPONSE_BODY_CAP: usize = 200;
+
+/// How many of a run's requests kept their response body. When some didn't, a limitation says
+/// how many and why, so a request without `response_body` isn't read as one that had no body.
+fn kept_body_limitation(network: &Value) -> Option<Limitation> {
+    let counts = network.get("response_bodies")?;
+    let total = counts.get("requests")?.as_u64()?;
+    let count = |key: &str| counts.get(key).and_then(Value::as_u64).unwrap_or(0);
+    let kept = count("kept");
+    if total <= kept {
+        return None;
+    }
+    let mut why = Vec::new();
+    for (key, words) in [
+        ("past_cap", format!("past the first {RESPONSE_BODY_CAP} requests")),
+        ("after_deadline", "after the run's deadline".to_string()),
+        ("unreadable", "whose body the browser couldn't return".to_string()),
+    ] {
+        let n = count(key);
+        if n > 0 {
+            why.push(format!("{n} {words}"));
+        }
+    }
+    let rest = match why.split_last() {
+        None => String::new(),
+        Some((last, [])) => last.clone(),
+        Some((last, head)) => format!("{} and {last}", head.join(", ")),
+    };
+    Some(Limitation::new(
+        "response_bodies_partial",
+        format!("{kept} of {total} requests kept a response body; the rest were {rest}, so a missing body doesn't mean the response had none."),
+    ))
 }
 
 /// How many JSON responses in the window got a body outline. When some didn't, a limitation says
@@ -2343,6 +2399,7 @@ fn web_walkthrough_record(ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput
     } else {
         Value::Null
     };
+    let bodies_partial = kept_body_limitation(&network);
     let event_rows = if families.is_empty() {
         Value::Null
     } else {
@@ -2399,6 +2456,9 @@ fn web_walkthrough_record(ctx: &mut Ctx<'_>, params: Value) -> Result<ToolOutput
         .location(Location::new("url", start_url));
     if p.hidden_values.iter().any(|s| !s.is_empty()) {
         b = b.limitation(Limitation::new("secrets_redacted", format!("{} occurrence(s) of declared values were redacted", secrets.redactions)));
+    }
+    if let Some(l) = bodies_partial {
+        b = b.limitation(l);
     }
     Ok(ToolOutput::evidence(b.build()?))
 }

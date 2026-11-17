@@ -136,6 +136,22 @@ fn closing_tag(lower: &str, from: usize, name: &str) -> Option<usize> {
     })
 }
 
+/// The end of a comment, measured from just after `<!--`.
+fn comment_end(rest: &str) -> usize {
+    if rest.starts_with('>') {
+        return 1;
+    }
+    if rest.starts_with("->") {
+        return 2;
+    }
+    rest.match_indices('>')
+        .find_map(|(i, _)| {
+            let before = rest.get(..i)?;
+            (before.ends_with("--") || before.ends_with("--!")).then_some(i + 1)
+        })
+        .unwrap_or(rest.len())
+}
+
 /// Scan an HTML document.
 pub fn scan_html(src: &str) -> HtmlFacts {
     let lower = src.to_ascii_lowercase();
@@ -201,8 +217,14 @@ pub fn scan_html(src: &str) -> HtmlFacts {
                 out.title = src.get(end..close).map(|t| decode_entities(t).trim().chars().take(200).collect());
                 pos = close.max(at + 1);
             }
-            _ if rest.starts_with("!--") => {
-                pos = lower.get(at..).and_then(|r| r.find("-->")).map_or(lower.len(), |c| at + c + 3);
+            _ if let Some(comment) = rest.strip_prefix("!--") => {
+                pos = at + 4 + comment_end(comment);
+            }
+            _ if (rest.starts_with('!') && !rest.starts_with("!doctype") && !rest.starts_with("![cdata["))
+                || rest.strip_prefix('/').and_then(|s| s.as_bytes().first()).is_some_and(|c| !c.is_ascii_alphabetic()) =>
+            {
+                // The bogus comment state ends at the first greater-than sign, even inside quotes.
+                pos = rest.find('>').map_or(lower.len(), |end| at + 2 + end);
             }
             _ if rest.as_bytes().first().is_some_and(u8::is_ascii_alphabetic)
                 || rest.strip_prefix('/').and_then(|s| s.as_bytes().first()).is_some_and(u8::is_ascii_alphabetic) =>
@@ -221,12 +243,18 @@ pub fn scan_html(src: &str) -> HtmlFacts {
 /// blocks such as JSON or HTML templates aren't JavaScript (#285).
 fn javascript_type(t: Option<&str>) -> bool {
     let Some(t) = t else { return true };
-    let essence = t.split(';').next().unwrap_or_default().trim().to_ascii_lowercase();
+    let essence = t.trim_matches(|c: char| c.is_ascii_whitespace()).to_ascii_lowercase();
     essence.is_empty()
         || essence == "module"
         || matches!(essence.as_str(), "text/babel" | "text/jsx" | "text/jscript" | "text/livescript")
         || [
             "text/javascript",
+            "text/javascript1.0",
+            "text/javascript1.1",
+            "text/javascript1.2",
+            "text/javascript1.3",
+            "text/javascript1.4",
+            "text/javascript1.5",
             "application/javascript",
             "application/ecmascript",
             "text/ecmascript",
@@ -236,7 +264,7 @@ fn javascript_type(t: Option<&str>) -> bool {
             "text/x-ecmascript",
         ]
         .iter()
-        .any(|m| essence == *m || essence.strip_prefix(m).is_some_and(|v| v.starts_with('1')))
+        .any(|m| essence == *m)
 }
 
 #[cfg(test)]
@@ -267,7 +295,7 @@ mod tests {
             let f = scan_html(&format!(r#"<script type="{t}">{{"imports": {{}}}}</script><script type="{t}" src="data.json"></script>"#));
             assert!(f.scripts.is_empty(), "{t}: {:?}", f.scripts);
         }
-        for t in ["", "module", "text/javascript", "Application/JavaScript", "text/javascript; charset=utf-8", "text/babel"] {
+        for t in ["", "module", "text/javascript", "Application/JavaScript", "text/babel"] {
             assert_eq!(scan_html(&format!(r#"<script type="{t}">fetch("/real-api");</script>"#)).scripts.len(), 1, "{t}");
         }
     }
