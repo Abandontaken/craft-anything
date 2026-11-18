@@ -789,12 +789,15 @@ yet, and the quick start is how every new person begins.
       the folder. Live in Debian 13 with Java set to a JDK's folder: Vineflower decompiled (before:
       "permission denied")
       — claimed: Fadlalla-ai, branch bugfix/r5.7-engine-path-folder
-- [ ] gdb, rizin sessions, adb, JADX, Apktool, Frida, tshark, lldb and the browser look up their program with
+- [x] gdb, rizin sessions, adb, JADX, Apktool, Frida, tshark, lldb and the browser look up their program with
       `engines::locate` and their own not-found message, so a folder set as their path without the
       program says it isn't installed rather than that the folder has no such program; use
       `Settings::engine_not_found` as the Java and disassembler tools do
-- [ ] A Java set for Ghidra (Settings → Engines, `engines.ghidra.java_home`) isn't used as the Java
-      runtime either, so Vineflower still says Java isn't installed with only that set
+      — claimed: justinjohn0306, branch bugfix/r5.5-engine-not-found-words
+- [x] A Java set for Ghidra (Settings → Engines, `engines.ghidra.java_home`) isn't used as the Java
+      runtime either, so Vineflower still says Java isn't installed with only that set. It now is
+      (`Settings::java_set_for_ghidra`), for JADX too, unless a path is set for Java itself
+      — claimed: justinjohn0306, branch bugfix/r5.7-ghidra-java-for-java-tools
 - [x] JADX doesn't use the Java runtime engine (the Java Ghidra's setup brings, or a Java path set in
       Settings → Engines): its launcher script finds Java only through `JAVA_HOME` or PATH, and
       neither is passed, so with no system Java, Java source of an Android class fails although
@@ -854,6 +857,12 @@ yet, and the quick start is how every new person begins.
       (`<name>.d`) names the app's sources, and start an older pin from its own copy only. Done:
       the newest of the project's own builds is started; an older pin looks only inside its copy
       — claimed: Fadlalla-ai, branch bugfix/r5.7-pin-own-program
+- [x] A saved Live pin (made before they were retired) starts the project's own app, not a copy,
+      but since the line above it looks only inside that folder: with the build in
+      `CARGO_TARGET_DIR` or a target directory set above the project it says there's nothing to
+      start. Keep the inside-only lookup for pins that keep a copy. Done: a Live pin finds the
+      build as Play's file lookup does; frozen and light pins still look only in their copy
+      — claimed: Fadlalla-ai, branch bugfix/r5.7-live-pin-external-build
 - [ ] Build the new DMG on a Mac (release dry run) and look at the window once
 - [ ] #490 on macOS: a real Deep build through Claude Code with the published 0.3.0 CLI, with
       2.1.179 and a current version. Windows passed; the Mac CLI was only checked to contain the
@@ -1080,6 +1089,11 @@ Owner: open · Status: in progress
       question or build stops before it begins (#1859). Ask once more after a short pause when
       that is what it said; a turn already retries OpenCode's 503s
       — claimed: FuryNocturn, branch bugfix/r2.2-opencode-models-503
+- [x] OpenCode prints that typed answer on stdout and `HTTP 503 Service Unavailable` on stderr,
+      and a failed run's error keeps only stderr, so the retry above never sees the answer and the
+      person is shown "HTTP 503" instead of OpenCode's reason (#1859). Read the typed answer from
+      stdout, retry on it, and name its message in the error
+      — claimed: justinjohn0306, branch bugfix/r2.2-opencode-503-stdout
 - [x] `docs/opencode.md` says "OpenCode V2" but not where to get it: OpenCode's install script
       and npm's `opencode-ai` give the 1.x line, whose `run` has no `--standalone` (npm's
       `@opencode/cli` is 2.x), so the check before a build
@@ -1205,6 +1219,8 @@ Owner: open · Status: in progress
 - [x] A Hermes `config.yaml` that starts with a byte-order mark gets our entry in its own
       `mcp_servers` table, not in a second one that hides the person's servers from Hermes.
       — claimed: Plastic-time, branch bugfix/r2.2-yaml-config-bom
+- [x] Match YAML block mapping keys across optional whitespace before the colon and require a mapping-indicator boundary after it, so `mcp_servers :` is updated in place and plain keys containing colons (`craft-anything:dev`) are left untouched.
+      — claimed: Plastic-time, branch bugfix/r2.2-yaml-mapping-key-boundaries
 - [ ] See whether Hermes still fails on 0.3.0 (#460: the fix its `fixed` label names was already in
       0.3.0 when it was filed, and it gives no version)
 
@@ -1327,6 +1343,10 @@ Owner: open · Status: in progress
 - [x] Codex's and Grok Build's `config.toml` keep their Windows line endings when setup adds or
       removes our entry.
       — claimed: Plastic-time, branch bugfix/r2.2-toml-config-crlf
+- [x] Codex's and Grok Build's `config.toml` accept an inline `mcp_servers` table (`mcp_servers = {}`
+      or `mcp_servers = { other = … }`) when adding, merging, or replacing our entry, keeping
+      comments, sibling entries, and line endings.
+      — claimed: Plastic-time, branch bugfix/r2.2-toml-inline-servers-table
 - [x] "Just ask" says before a question is sent when the project's builder can't answer
       questions (Codex, OpenCode and the other agents that can't be held to reading), and which
       AIs can, instead of refusing only after it's sent (#1695)
@@ -1681,7 +1701,11 @@ Gaps found while using the app for real projects.
       with a plain error, while files at or under the cap page as before. The regression covers
       the cap and the boundary
       — claimed: AlexJoaquimPereira, branch bugfix/r2.9-build-file-read-cap
-- [ ] `build_file_edit` also reads the whole file into memory; cap it the same way
+- [x] `build_file_edit` read the whole project file into memory before replacing text; it now
+      uses the same 16 MiB cap as a read, refusing a larger file before it is loaded and leaving
+      it unchanged. A file at the cap still edits when the result fits the 8 MB write cap. Engine
+      regressions cover the over-cap refusal and the boundary
+      — claimed: AlexJoaquimPereira, branch bugfix/r2.9-build-file-edit-cap
 - [x] Choose Claude Code's folder (`CLAUDE_CONFIG_DIR`) per AI, so one computer can build with
       two Claude accounts; an app opened from the Dock never sees the shell's variable. Settings →
       AI (a typed folder, and Add another) and `ai folder`; live-checked from the CLI with an empty
@@ -1953,6 +1977,14 @@ Owner: open · Status: in progress
       — claimed: Afloat16, branch feature/r3.9-rgb9e5-textures-20261110
 - [ ] Unreal 5 and Oodle: IoStore packages, unversioned properties and Oodle-compressed paks
 - [ ] Game files: save pictures from IoStore containers (needs the Unreal 5 support above)
+- [x] A look at one game's folder or archive could land after the person picked another one, so
+      the old profile, archive list or file rows were shown under the new pick and a save could
+      name an item from the old game. Done: the button job carries its request, and a result for a
+      folder or archive no longer shown is ignored, including its error; UI regressions cover both
+      scopes and an ignored error
+      — claimed: AlexJoaquimPereira, branch bugfix/r3.9-game-files-stale-results
+- [ ] Pick game A, B, then A again while the first A look is still running: the older A result can
+      still land after the newer one. Correlate each look with a request id, not only the path
 - [x] Decode Unreal packed 10-bit normalized and 11-bit floating-point textures through the bounded picture exporter.
       — claimed: Afloat16, branch feature/r3.9-unreal-packed-textures-20261111
 - [x] Unreal: decode cooked half- and full-precision floating-point textures with the shared bounded pixel reader.
@@ -2020,10 +2052,18 @@ Owner: open · Status: in progress
       — claimed: muraa-p, branch feature/r3.11-standalone-pyz
 - [x] Collect native function evidence from every body block and infer parameters from its actual entry block.
       — claimed: Afloat16, branch bugfix/r3.11-native-function-block-evidence-20261110
+- [x] Resolve known library argument counts across ELF symbol-version (`@GLIBC_…`, `@@GLIBC_…`) and Darwin symbol-variant (`$UNIX2003`, `$INODE64`) suffixes when lifting imported calls to pseudo-C.
+      — claimed: Plastic-time, branch bugfix/r3.11-disasm-versioned-import-arity
+- [x] Record full register-list and base-pointer read/write effects for ARM32 and Thumb `pop`, `push`,
+      `ldm`, and `stm` instructions (including writeback bases).
+      — claimed: Plastic-time, branch bugfix/r3.11-a32-reglist-reads-writes
 - [ ] `native_source_folder_write` uses the built-in decompiler only: use Ghidra in Deep mode when
       it's there
 - [x] Keep source registers alive when an AArch64 arithmetic result is discarded into the zero register.
       — claimed: Afloat16, branch bugfix/r3.11-a64-discarded-results-20261111
+- [x] Lift AArch64 `cmn` (`adds xzr/wzr, …`) branch conditions as `(a + b) <op> 0` and omit
+      discarded `xzr`/`wzr` assignments in pseudo-C.
+      — claimed: Plastic-time, branch bugfix/r3.11-a64-cmn-zero-destination
 - [x] Keep stand-in response samples distinct when headers, content types or body-availability metadata differ.
       Compare header names without case and ignore ordering between different names, preserving each name's value order.
       At the sample cap, a usable answer can replace an unavailable 304 for the same path, query and request key;
@@ -2056,6 +2096,8 @@ Owner: open · Status: in progress
 - [x] Fold an AArch64 MOVZ/MOVK sequence into one constant in pseudo-C: `mov w9, #0x2493` then
       `movk w9, #0x9249, lsl #16` reads as two statements, not `w9 = 0x92492493;`
       — claimed: Jensen-Yao, branch bugfix/r3.11-a64-movz-movk-constants
+- [x] Slice interior string literal references in pseudo-C by encoded byte offset for UTF-8 and UTF-16LE strings, rejecting misaligned interior addresses instead of skipping characters by byte count.
+      — claimed: Plastic-time, branch bugfix/r3.11-pseudo-string-slice-offsets
 - [x] Enforce stand-in per-body and total byte budgets on the text that is actually retained after redaction;
       deduplicate consecutive samples before charging the capture budget.
       — claimed: Afloat16, branch bugfix/r3.11-standin-redacted-budget-20261103b
@@ -2113,6 +2155,8 @@ Owner: open · Status: in progress
       — claimed: Afloat16, branch bugfix/r3.12-source-map-comparison-uncertainty-20261111
 - [x] Bound expanded source-map inventories by retained path bytes and entries before allocation, preserving bounded prefixes and reporting truncation.
       — claimed: Afloat16, branch bugfix/r3.12-source-inventory-budget-20261111
+- [x] Count embedded `sourcesContent` across nested inline sections in indexed source maps and strip only the literal `.map` suffix from stand-alone map paths.
+      — claimed: Plastic-time, branch bugfix/r3.12-indexed-sourcemap-content-counts
 - [x] Preserve readable ZIP64 end-record fields with framing warnings and classic fallback for unusable locators; reject undersized, overflowing or truncated fixed records.
       — claimed: Afloat16, branch bugfix/r3.12-zip64-record-extent
 - [x] Recover ZIP64 records shifted by prepended data with a bounded lookbehind and preserve the fallback for locator-shaped classic comments.
@@ -2158,6 +2202,9 @@ Owner: open · Status: in progress
       — claimed: Plastic-time, branch bugfix/r3.12-graphql-string-line-breaks
 - [x] Keep escaped triple quotes inside GraphQL block strings when reading operations.
       — claimed: Plastic-time, branch bugfix/r3.12-graphql-block-strings
+- [x] Keep GraphQL operations in documents that also declare braceless type-system definitions (`scalar`, `union`, `directive`, `extend`) or leading descriptions.
+      — claimed: Plastic-time, branch bugfix/r3.12-graphql-type-system-definitions
+- [x] Skip GraphQL ignored tokens between `@` and directive names in `api_ops` annotations and directive definitions. — claimed: Plastic-time, branch bugfix/r3.12-graphql-directive-trivia
 - [x] Read `+` in JavaScript constant text as JavaScript does: numbers add (`'/v' + (1 + 2)` is `/v3`, not `/v12`) and number literals read as their value (`0x10` is `16`).
       — claimed: Plastic-time, branch bugfix/r3.12-js-numeric-addition
 - [x] Walk past the old GNU sparse extension blocks to list the next TAR member.
@@ -2223,6 +2270,11 @@ Owner: open · Status: in progress
       — tests cover a UTF-8 character, a UTF-16 surrogate pair and a UTF-16 continuation-like
       byte at the cut; invalid bytes keep their lossy prefix. Claimed: AlexJoaquimPereira,
       branch bugfix/r3.12-sqlite-text-cap
+- [x] Read parenthesized column names in SQLite WITHOUT ROWID primary keys.
+      — claimed: Plastic-time, branch bugfix/r3.12-sqlite-parenthesized-primary-key
+- [x] Read SQLite primary keys across comma-omitted adjacent table constraints and parenthesized rowid aliases. — claimed: Plastic-time, branch bugfix/r3.12-sqlite-adjacent-table-constraints
+- [x] Count SQLite WITHOUT ROWID primary-key fields by column and effective collation.
+      — claimed: Plastic-time, branch bugfix/r3.12-sqlite-key-collations
 - [x] WITHOUT ROWID rows stored before ALTER TABLE ADD COLUMN show the added columns' defaults,
       as rowid tables already do, instead of NULL.
       — claimed: Plastic-time, branch bugfix/r3.12-sqlite-without-rowid-added-columns
@@ -2266,6 +2318,8 @@ Owner: open · Status: in progress
       — claimed: Afloat16, branch bugfix/r3.12-capture-evidence
 - [x] Reject impossible IPv4 header and total lengths.
       — claimed: Afloat16, branch bugfix/r3.12-ipv4-header-lengths-20261105
+- [x] Stop IPv6 transport decoding at No Next Header.
+      — claimed: Plastic-time, branch bugfix/r3.12-ipv6-no-next-header
 - [x] Validate the version in IPv6 frames.
       — claimed: Afloat16, branch bugfix/r3.12-ipv6-version-20261105
 - [x] Decode VLAN-encapsulated network packets in Linux cooked v1 and v2 captures.
@@ -2279,6 +2333,8 @@ Owner: open · Status: in progress
       The [unchanged-code baseline](https://github.com/Afloat16/claude-mem/actions/runs/42636776430/job/129226895582) reproduces the new regression cases.
 - [x] Recognize ZIP directories from DOS directory attributes and Unix file-type metadata when the entry name has no trailing slash.
       — claimed: Afloat16, branch bugfix/r3.12-zip-directory-attributes
+- [x] Recognize legacy Zstandard ZIP method 20 in archive reading and firmware discovery.
+      — claimed: Plastic-time, branch bugfix/r3.12-zip-legacy-zstd
 - [x] Read ZIP bzip2 and XZ members through the existing bounded pure-Rust decompressors.
       — claimed: Afloat16, branch feature/r3.12-zip-bzip2-xz-20261109
       Source [`4cac3638`](https://github.com/Afloat16/craft-anything/commit/4cac36386e426e332bd89cb2cfa63894f3a367a5) passed [formats tests, fmt and clippy](https://github.com/Afloat16/claude-mem/actions/runs/42636776430/job/129226892219)
@@ -2422,6 +2478,10 @@ Owner: open · Status: in progress
       — claimed: Afloat16, branch bugfix/r3.12-android-script-locale
 - [x] Bound decoded Android string-pool bytes and disclose partial pools in binary XML and resource tables, so shared offsets cannot multiply a small chunk into unbounded retained strings.
       — claimed: Afloat16, branch bugfix/r3.12-android-pool-retained-bytes-20261110
+- [x] Use the effective Android target SDK when inferring a component's exported state.
+      — claimed: Plastic-time, branch bugfix/r3.12-android-provider-sdk-default
+- [x] Read integer-typed boolean attributes and the unnamespaced manifest package attribute in Android binary XML manifests.
+      — claimed: Plastic-time, branch bugfix/r3.12-axml-typed-booleans
 - [x] Carry incomplete Android manifest decoding into package and component evidence coverage, including the last component page, without substituting ZIP-entry counts for document completeness.
       — claimed: Afloat16, branch bugfix/r3.12-android-manifest-coverage-20261110
 - [x] Read 16-bit native pointers without consuming adjacent bytes.
@@ -2431,6 +2491,8 @@ Owner: open · Status: in progress
 - [x] Preserve a unique versioned ELF import slot when relocation records omit the library name (follow-up to #1365).
       — claimed: Afloat16, branch bugfix/r3.12-elf-versioned-import-slot-fallback-20261109
       — completed: 1179870c55203d946bb8a7412b9b8f1088352fe3
+- [x] Require a NUL terminator in Mach-O load-command paths before reporting path evidence.
+      — claimed: Plastic-time, branch bugfix/r3.12-macho-complete-command-paths
 - [x] Keep Mach-O load-command facts within their command.
       — claimed: Afloat16, branch bugfix/r3.12-macho-load-command-framing-20261105
 - [x] Resolve Mach-O UNIXTHREAD entry points from a complete state record for the image CPU, including later state records.
@@ -2703,6 +2765,9 @@ Owner: open · Status: in progress
       — claimed: Afloat16, branch bugfix/r3.12-dotnet-volatile-modifiers-20261110
 - [x] Preserve complete Unicode characters in shortened .NET strings.
       — claimed: Afloat16, branch bugfix/r3.12-dotnet-user-string-surrogate-limit-20261105
+- [x] Treat `@`-prefixed C# verbatim identifiers (`@namespace`, `@class`, `@record`, `@event`, `@operator`, `@ref`) as identifiers rather than keywords when scanning declarations.
+      — claimed: Plastic-time, branch bugfix/r3.12-csharp-verbatim-identifiers
+- [x] Check the token `kw` flag before stripping `checked` in C# conversion and checked operators so `@checked` keeps its target type name. — claimed: Plastic-time, branch bugfix/r3.12-csharp-verbatim-checked-conversion
 - [x] Reject CIL branch and switch destinations outside the method body without wrapping signed displacements.
       — claimed: Afloat16, branch bugfix/r3.12-cil-branch-target-ranges-20261111
 - [x] Validate CIL method exception-section kinds, extents and complete clause records before reading exception handlers.
@@ -2719,6 +2784,8 @@ Owner: open · Status: in progress
       — claimed: Afloat16, branch bugfix/r3.12-elf-core-file-name-count-cap-20261105
 - [x] Advance ELF core NT_FILE path cursors by complete original byte strings, even when a displayed path is lossy or capped.
       — claimed: Afloat16, branch bugfix/r3.12-elf-core-path-cursor-20261109
+- [x] Build indexed source-map inventories from the section maps.
+      — claimed: Plastic-time, branch bugfix/r3.12-indexed-map-source-inventory
 - [x] Validate index source map section offsets and stop an unresolved section from borrowing mappings from the preceding section.
       — claimed: Afloat16, branch bugfix/r3.12-index-map-boundaries
 - [x] Preserve the URL delimiter in source-map roots when resolving a relative source file.
@@ -2749,12 +2816,18 @@ Owner: open · Status: in progress
       — claimed: Plastic-time, branch bugfix/r3.12-sourcemap-annotation-spacing-1111
 - [x] Keep source map annotation URL suffixes intact.
       — claimed: Plastic-time, branch rrfz/bugfix-r3.12-annotation-20261110
+- [x] Use the legacy HTML script language to classify scripts without a type attribute.
+      — claimed: Plastic-time, branch bugfix/r3.12-html-legacy-script-language
+- [x] Require the exact module keyword in HTML script inventories while retaining whitespace trimming for classic MIME types.
+      — claimed: Plastic-time, branch bugfix/r3.12-html-exact-module-keyword
 - [x] Match HTML script types against complete JavaScript MIME names and the exact module keyword.
       — claimed: Plastic-time, branch bugfix/r3.12-html-types-1116
 - [x] The JavaScript crate's `sourceMappingURL` reader is the formats reader, so the standard
       no-space annotation is found, tabs and repeated spaces are accepted, and a URL containing
       whitespace is rejected, on the parsed and lexer paths alike.
       — claimed: AlexJoaquimPereira, branch bugfix/r3.12-js-sourcemap-annotation
+- [x] Require the full PE signature at the DOS extended-header offset.
+      — claimed: Plastic-time, branch bugfix/r3.12-dos-extended-pe-signature
 - [x] Keep DOS relocations inside the declared executable header.
       — claimed: Afloat16, branch bugfix/r3.12-dos-relocation-header-boundary-20261105
 - [x] Report contradictory DOS executable size declarations as header problems.
@@ -2776,6 +2849,8 @@ Owner: open · Status: in progress
       — claimed: Afloat16, branch feature/r3.12-squashfs-lz4-20261110
 - [x] Report truncated SquashFS metadata blocks and retain previously recovered blocks.
       — claimed: Afloat16, branch bugfix/r3.12-squashfs-metadata-warning
+- [x] Bound SquashFS inode and directory metadata tables by every following superblock table (`fragment`, `export`, `id`, `xattr`) and the filesystem size.
+      — claimed: Plastic-time, branch bugfix/r3.12-squashfs-table-bounds
 - [x] Require each raw or decoded file block to cover exactly its logical range, including the partial final block, so short blocks cannot shift later contents and long blocks cannot be hidden by truncation.
       — claimed: Afloat16, branch bugfix/r3.12-squashfs-block-output-size-20261110
 - [x] Recover zero-filled cramfs hole blocks at full and partial page boundaries while retaining the existing recovery budgets.
@@ -2821,6 +2896,8 @@ Owner: open · Status: in progress
       — claimed: Afloat16, branch bugfix/r3.12-firmware-zip-extent-20261110
 - [x] Exercise signed PAX lengths, empty keys and equals signs inside a path value.
       — claimed: Afloat16, branch bugfix/r3.12-pax-record-framing
+- [x] Apply valid PAX size overrides before reading the TAR member's legacy size field.
+      — claimed: Plastic-time, branch bugfix/r3.12-tar-pax-size-precedence
 - [x] Reject invalid local PAX sizes before listing the affected TAR member.
       — claimed: Plastic-time, branch bugfix/r3.12-tar-local-pax-size-1112
 - [x] Apply global PAX archive attributes to later members, honor local overrides and global deletions, and bound inherited name copies before extraction.
@@ -2852,6 +2929,8 @@ Owner: open · Status: in progress
       the WITHOUT ROWID marker: find the list's closing parenthesis by tokens, not `rfind(')')`.
       — claimed: Chr0mium24, branch bugfix/r3.12-sqlite-options-after-comment
 
+- [x] Include the legacy uses-permission-sdk-m tag in Android manifest permission inventories.
+      — claimed: Plastic-time, branch bugfix/r3.12-android-sdk-m-permissions
 - [x] Keep Android binary XML events within their document, chunk and attribute bounds.
       — claimed: Afloat16, branch bugfix/r3.12-android-xml-events
 - [x] Reject Java Long and Double constants without their reserved constant-pool slot, including the maximum u16 pool boundary.
@@ -2867,6 +2946,8 @@ Owner: open · Status: in progress
       — claimed: Afloat16, branch feature/r3.12-jvm-bootstrap-references
 - [x] Find the method parameter terminator outside object type names in JVM descriptors.
       — claimed: Afloat16, branch bugfix/r3.12-java-descriptor-boundary
+- [x] Report incomplete Java class attribute tables while keeping readable attributes.
+      — claimed: Plastic-time, branch bugfix/r3.12-java-truncated-attributes
 - [x] Validate complete JVM switch payloads before reserving pairs, and reject duplicate or descending lookup keys instead of emitting invalid control-flow facts.
       — claimed: Afloat16, branch bugfix/r3.12-java-switch-tables-20261110
 - [x] Stop JVM bytecode decoding on invalid primitive array type codes or zero-dimensional multidimensional allocations while retaining valid allocations.
@@ -2900,6 +2981,8 @@ Owner: open · Status: in progress
       — claimed: Afloat16, branch bugfix/r3.12-nib-utf16-detection-20261111
 - [x] Distinguish the keyed archive's null sentinel at object zero from ordinary stored strings containing the same text.
       — claimed: Afloat16, branch bugfix/r3.12-keyed-archive-null-string-20261110
+- [x] Resolve UID-referenced `NS.bytes` string payloads within the retained-byte budget and project integer `NSDate` `NS.time` values in keyed archives.
+      — claimed: Plastic-time, branch bugfix/r3.12-keyed-archive-nsbytes-nsdate
 - [x] Reject NIB variable-length integers whose tenth byte exceeds the unsigned 64-bit range, instead of letting truncated high bits become an unrelated length or index.
       — claimed: Afloat16, branch bugfix/r3.12-nib-integer-overflow-20261110
 - [x] Accept binary plist arrays and sets that name one stored value many times; repeated data and
@@ -3031,6 +3114,8 @@ Owner: open · Status: in progress
 
 - [x] Require call syntax for tRPC client hooks in JavaScript lexer fallback facts.
       — claimed: Plastic-time, branch bugfix/r3.12-trpc-calls-1116
+- [x] Keep literal dynamic imports with options or a trailing comma in JavaScript lexer fallback facts.
+      — claimed: Plastic-time, branch bugfix/r3.12-dynamic-import-options
 - [x] Keep side-effect imports in JavaScript lexer fallback facts.
       — claimed: Plastic-time, branch bugfix/r3.12-js-side-effect-imports-1115
 - [x] Bound the JavaScript lexer fallback's `endpoints` (fetch calls and URL literals) and
@@ -3054,6 +3139,11 @@ Owner: open · Status: in progress
       with left/right labels.
       — claimed: AlexJoaquimPereira, branch bugfix/r3.12-compare-graph-limitations
 
+- [x] Match modules, bundle modules, and export outlines in `js_compare` across exclusive
+      priority passes so each right-hand module is claimed at most once and lower-priority
+      matches cannot steal later exact-path or higher-tier pairs.
+      — claimed: Plastic-time, branch bugfix/r3.12-js-compare-exclusive-tiers
+
 
 - [x] Take target file signatures from the shared craft-sniff table. The app still breaks ties
       that need its own parsers (managed PE, Java class versus a universal Mach-O, APK by name
@@ -3064,10 +3154,18 @@ Owner: open · Status: in progress
 Owner: open · Status: in progress
 - [x] Decode character references in HTML page titles before returning their displayed text.
       — claimed: Plastic-time, branch rrfz/bugfix-r3.13-html-title-entities
+- [x] Resolve embedded source snippets, `ignoreList` flags and total source counts from the active section map when tracing generated locations in indexed source maps.
+      — claimed: Plastic-time, branch bugfix/r3.13-indexed-sourcemap-trace-context
+- [x] Write captured HAR request body MIME types from the retained request headers.
+      — claimed: Plastic-time, branch bugfix/r3.13-har-request-mime
 - [x] Report received HAR response body sizes separately from decoded content sizes and identify entries whose sizes are unknown.
       — claimed: Afloat16, branch bugfix/r3.13-har-transfer-size
 - [x] Read HAR captures with the permitted UTF-8 byte order mark.
       — claimed: Afloat16, branch bugfix/r3.13-har-bom-bounds-20261107
+- [x] Retain multiple HTML meta Content-Security-Policy values in page evidence.
+      — claimed: Plastic-time, branch bugfix/r3.13-html-meta-csp-list
+- [x] Require complete HTML start tags before recording scripts, preloads and page metadata.
+      — claimed: Plastic-time, branch bugfix/r3.13-html-incomplete-tags
 - [x] Resume scanning after an HTML comment that a browser closes with `--!>` or an abrupt empty end.
       — claimed: Plastic-time, branch bugfix/r3.13-html-comment-endings
 - [x] Skip bogus HTML comments opened by unknown declarations and malformed end tags before listing scripts or preloads.
@@ -3080,12 +3178,32 @@ Owner: open · Status: in progress
       backend matches older recordings the same way), redact declared secrets in every kept field
       (names, methods, hosts, versions, timings), count body bytes before text conversion, and
       template only real calendar dates in API paths (#602–#605, by Afloat16)
+- [x] Redact declared HAR secrets in `application/x-www-form-urlencoded` spellings (`+` with `%XX`), mixed-case percent escapes and encoded form field names.
+      — claimed: Plastic-time, branch bugfix/r3.13-har-secret-encodings
 - [x] Preserve empty query pairs when matching older stand-in recordings, without treating raw
       query separators as pairs — claimed: Afloat16, branch `bugfix/r3.13-preserve-empty-query-pairs-20261103`
 - [x] A walkthrough's `keep_bodies` keeps response bodies only for the first 200 requests and says
       nothing about the rest (#1811; `web_page_show`'s outlines were fixed in #1845): count the kept
       bodies and say how many were left out and why.
       — claimed: htcom-code, branch bugfix/r3.13-body-outline-cap
+- [x] A page that opens an `alert` on load makes `web_site_open` time out (#2010): answer the
+      page's JavaScript dialogs (accept `alert`/`beforeunload`, dismiss `confirm`/`prompt`) and say
+      which ones it opened. — claimed: htcom-code, branch bugfix/r3.13-js-dialog-blocks-open
+- [x] The tools that connect to a page on their own (`browser_tools.rs`: walkthroughs and
+      `web_page_show`; `web_runtime_tools.rs`; `electron_runtime_tools.rs`) don't answer JavaScript
+      dialogs yet, so a page that opens one mid-run still stalls them: give them
+      `CdpClient::answering_dialogs` and report the dialogs the same way (#2010). Done: they answer
+      the page's dialogs (alerts and leave-page questions accepted, confirm and prompt dismissed)
+      and list each one with its answer in the result and summary; fake-CDP regressions cover
+      `web_page_show`, a walkthrough, coverage measurement, listeners and the module graph.
+      — claimed: AlexJoaquimPereira, branch bugfix/r3.13-page-tools-dialogs
+- [x] `web_page_js_analyze` and `web_page_watch` still attach to a page without answering its
+      dialogs, as do `web_mcp_tools_list` and `web_page_screenshot_take`: a page that opens one
+      mid-run can still stall them. Done: all four use the answering connect, which enables Page
+      so Page.javascriptDialogOpening arrives; each result and summary lists the dialogs, with
+      declared secrets redacted where the tool has hidden values. Fake-CDP regressions cover all
+      four
+      — claimed: AlexJoaquimPereira, branch bugfix/r3.13-remaining-page-dialogs
 
 ---
 

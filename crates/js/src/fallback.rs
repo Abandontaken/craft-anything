@@ -20,10 +20,15 @@ pub(crate) fn facts_from_tokens(tokens: &[Token<'_>], lines: &LineIndex) -> Modu
         api_token(&mut f, &sig, i, off, line);
         match (t.kind, t.text) {
             (TokKind::Ident, "require" | "import") if at(i + 1) == Some((TokKind::Punct, "(")) => {
+                let dynamic = t.text == "import";
+                if dynamic && i.checked_sub(1).and_then(at).is_some_and(|p| matches!(p, (TokKind::Punct, "." | "?."))) {
+                    continue;
+                }
+                let after_specifier = at(i + 3);
                 if let Some((TokKind::Str, s)) = at(i + 2)
-                    && at(i + 3) == Some((TokKind::Punct, ")"))
+                    && (after_specifier == Some((TokKind::Punct, ")")) || (dynamic && after_specifier == Some((TokKind::Punct, ","))))
                 {
-                    let kind = if t.text == "require" { "require" } else { "dynamic-import" };
+                    let kind = if dynamic { "dynamic-import" } else { "require" };
                     add_import(&mut f, kind, string_value(s), line, off);
                 }
             }
